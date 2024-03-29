@@ -20,6 +20,7 @@ resource "kubernetes_service" "spargel" {
     port {
       port        = 25565
       target_port = 25565
+      node_port   = 30000
     }
   }
 }
@@ -55,6 +56,27 @@ resource "kubernetes_stateful_set" "spargel" {
             mount_path = "/data"
             name       = "spargel"
           }
+
+          env {
+            name  = "VERSION"
+            value = "1.19.2"
+          }
+          env {
+            name  = "EULA"
+            value = "TRUE"
+          }
+          env {
+            name  = "SEED"
+            value = "spargel"
+          }
+          env {
+            name  = "TYPE"
+            value = "FORGE"
+          }
+          env {
+            name  = "MEMORY"
+            value = "24G"
+          }
         }
 
         volume {
@@ -69,7 +91,36 @@ resource "kubernetes_stateful_set" "spargel" {
   }
 }
 
+resource "kubernetes_storage_class" "spargel" {
+  metadata {
+    name = "spargel"
+  }
+  storage_provisioner    = "kubernetes.io/no-provisioner"
+  allow_volume_expansion = true
+}
+
+resource "kubernetes_persistent_volume" "spargel" {
+  metadata {
+    name = "spargel"
+  }
+
+  spec {
+    storage_class_name = "spargel"
+    access_modes       = ["ReadWriteOnce"]
+    capacity           = {
+      storage = "8Gi"
+    }
+    persistent_volume_source {
+      host_path {
+        path = "/root/volume/spargel"
+        type = "DirectoryOrCreate"
+      }
+    }
+  }
+}
+
 resource "kubernetes_persistent_volume_claim" "spargel" {
+  wait_until_bound = false
   metadata {
     name      = "spargel"
     namespace = kubernetes_namespace.spargel.metadata[0].name
@@ -77,10 +128,10 @@ resource "kubernetes_persistent_volume_claim" "spargel" {
 
   spec {
     access_modes       = ["ReadWriteOnce"]
-    storage_class_name = "local-path"
+    storage_class_name = "spargel"
     resources {
       requests = {
-        storage = "4Gi"
+        storage = "8Gi"
       }
     }
   }
